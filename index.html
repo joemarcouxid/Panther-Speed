@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Panther Speed</title>
+<meta name="description" content="Sprint training for Wenatchee High School — 100, 200, 400." />
+<meta name="theme-color" content="#380F4F" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Panther Speed" />
+<style>
+  html, body { margin: 0; padding: 0; background: #F3F0F6; }
+  #root { min-height: 100vh; }
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+/* ============================================================
+   PANTHER SPEED — Wenatchee High School sprints (100 / 200 / 400)
+
+   Coach posts the week to a shared board. Athletes open the app
+   and see today. No training jargon anywhere an athlete reads.
+   ============================================================ */
+
+/* ---------- storage ----------
+   Right now everything saves to this phone only (localStorage).
+   The shared coach board plugs in HERE later — see docs/PROGRESS.md.
+   Keys are prefixed so team data and personal data never collide.
+------------------------------------------------------------------ */
+const store = {
+  async get(k, shared = false) {
+    try {
+      const v = localStorage.getItem((shared ? "team:" : "me:") + k);
+      return v ? JSON.parse(v) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+  async set(k, v, shared = false) {
+    try {
+      localStorage.setItem((shared ? "team:" : "me:") + k, JSON.stringify(v));
+    } catch (e) {
+      /* private browsing or full storage — app still runs, just won't remember */
+    }
+  },
+};
+
+const BOARD_KEY = "panther:board:v2";
+const LOG_KEY = "panther:log:v2";
+const LOGO_KEY = "panther:logo:v2";
+
+/* ---------- time helpers ---------- */
+const parseTime = (s) => {
+  if (!s) return null;
+  const t = String(s).trim();
+  if (t.includes(":")) {
+    const [m, sec] = t.split(":");
+    const v = parseInt(m, 10) * 60 + parseFloat(sec);
+    return isNaN(v) ? null : v;
+  }
+  const v = parseFloat(t);
+  return isNaN(v) ? null : v;
+};
+const fmtTime = (v) => {
+  if (v == null || isNaN(v)) return "—";
+  if (v < 60) return v.toFixed(2);
+  const m = Math.floor(v / 60);
+  const s = v - m * 60;
+  return `${m}:${s < 10 ? "0" : ""}${s.toFixed(2)}`;
+};
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const todayIndex = () => (new Date().getDay() + 6) % 7;
+
+/* ---------- events & time of year ---------- */
+const EVENTS = [
+  { id: "e100", label: "100", full: "100 meters" },
+  { id: "e200", label: "200", full: "200 meters" },
+  { id: "e400", label: "400", full: "400 meters" },
+];
+
+const PHASES = [
+  { id: "gpp", label: "Summer base", when: "June to September" },
+  { id: "spp", label: "Fall build", when: "October to November" },
+  { id: "precomp", label: "Indoor season", when: "December to February" },
+  { id: "comp", label: "Outdoor season", when: "March to May" },
+  { id: "peak", label: "Championship weeks", when: "May to June" },
+];
+
+/* ---------- warmups (plain language) ---------- */
+const WARM = {
+  hard:
+    "Jog 400m easy. Leg swings. Marching drills, skips, then quick low shuffles. Finish with four 30m buildups where you roll into speed. Give this a full 12 minutes.",
+  easy:
+    "Jog 600m on the grass. Hurdle mobility, over and under, two sets of six. Skips. Two 60m strides.",
+  premeet: "Your full meet warmup, run exactly the way you'll run it on race day. Nothing new.",
+  meet:
+    "Start 20 minutes before your race. Jog 800m, dynamic stretches, three 40m buildups, two starts out to 20m. Spikes on. Then keep moving and stay warm.",
+};
+
+/* ---------- session library ----------
+   reps: { d: meters, label, rest }
+   All wording written for a 15-year-old to read on the track.
+------------------------------------------- */
+const LIB = {
+  starts: {
+    name: "Starts and acceleration",
+    kind: "hard",
+    why:
+      "The first 30 meters is the only part of the race where you're actually speeding up. Long rest between reps is the whole point — tired reps don't make you faster, they just make you tired.",
+    reps: {
+      gpp: [
+        { d: 20, label: "8 × 20m from a 3-point start (one hand down), full effort", rest: "3 minutes" },
+        { d: 30, label: "4 × 30m up the hill, all out", rest: "walk down, then 3 minutes" },
+      ],
+      spp: [
+        { d: 30, label: "5 × 30m from a 3-point start", rest: "4 minutes" },
+        { d: 20, label: "3 × 20m on the ExerGenie set light — you should barely feel it slowing you", rest: "3 minutes" },
+      ],
+      precomp: [
+        { d: 20, label: "4 × 20m from the blocks — your first move is a push, not a stand-up", rest: "3 minutes" },
+        { d: 30, label: "3 × 30m from the blocks, timed", rest: "5 minutes" },
+      ],
+      comp: [
+        { d: 20, label: "3 × 20m from the blocks", rest: "3 minutes" },
+        { d: 30, label: "2 × 30m from the blocks, timed", rest: "5 minutes" },
+      ],
+      peak: [
+        { d: 20, label: "3 × 20m from the blocks — sharp, then stop while it still feels easy", rest: "4 minutes" },
+        { d: 30, label: "1 × 30m timed", rest: "done" },
+      ],
+    },
+  },
+  topspeed: {
+    name: "Top speed",
+    kind: "hard",
+    why:
+      "Your fastest speed is a skill, and it fades if you never touch it. This only works on fresh legs. Tired top-speed work isn't top speed, it's just running.",
+    reps: {
+      gpp: [
+        { d: 30, label: "3 × runs through the mini hurdles — find the rhythm, don't reach for them", rest: "4 minutes" },
+        { d: 20, label: "2 × flying 20m: build for 30m, then hold your fastest speed through the next 20m", rest: "6 minutes" },
+      ],
+      spp: [
+        { d: 30, label: "4 × runs through the mini hurdles", rest: "4 minutes" },
+        { d: 20, label: "3 × flying 20m off a 30m buildup", rest: "6 to 8 minutes" },
+      ],
+      precomp: [
+        { d: 30, label: "4 × runs through the mini hurdles", rest: "4 minutes" },
+        { d: 20, label: "3 × flying 20m off a 30m buildup — time every one", rest: "6 to 8 minutes" },
+        { d: 60, label: "1 × 60m from a standing start, take a split at 30m", rest: "done" },
+      ],
+      comp: [
+        { d: 60, label: "2 × 20-20-20: sprint 20m, relax and coast 20m, sprint 20m", rest: "8 minutes" },
+        { d: 20, label: "2 × flying 20m, timed", rest: "8 minutes" },
+      ],
+      peak: [{ d: 20, label: "2 × flying 20m off a 30m buildup, timed — then walk away", rest: "8 minutes" }],
+    },
+  },
+  speedend: {
+    name: "Speed endurance",
+    kind: "hard",
+    why:
+      "This is what holds your last 20 meters together. The long rests are deliberate — cut them short and the whole session turns into medium-pace running, which builds nothing.",
+    reps: {
+      gpp: [{ d: 80, label: "2 × 80m at just about full effort — easing into it", rest: "8 minutes" }],
+      spp: [{ d: 80, label: "3 × 80m at just about full effort from a 3-point start", rest: "8 to 10 minutes" }],
+      precomp: [{ d: 120, label: "3 × 120m at just about full effort", rest: "10 to 12 minutes" }],
+      comp: [
+        { d: 150, label: "2 × 150m at just about full effort, timed", rest: "12 to 15 minutes" },
+        { d: 120, label: "1 × 120m", rest: "done" },
+      ],
+      peak: [{ d: 120, label: "1 × 120m, timed. This is your last really hard run before the meet.", rest: "done" }],
+    },
+  },
+  longspeed200: {
+    name: "Long speed",
+    kind: "hard",
+    why:
+      "The 200 goes to whoever slows down least. These runs teach your body to hold its shape past 150m when everything is telling you to tighten up.",
+    reps: {
+      gpp: [{ d: 180, label: "2 × 180m around a full curve, near full effort", rest: "15 minutes" }],
+      spp: [{ d: 200, label: "2 × 200m from a 3-point start, near full effort", rest: "15 to 18 minutes" }],
+      precomp: [
+        { d: 250, label: "1 × 250m, near full effort", rest: "20 minutes" },
+        { d: 150, label: "1 × 150m, timed", rest: "done" },
+      ],
+      comp: [{ d: 200, label: "2 × 200m from the blocks, full curve, timed", rest: "20 to 25 minutes" }],
+      peak: [{ d: 150, label: "1 × 150m at race effort, timed", rest: "done" }],
+    },
+  },
+  longspeed400: {
+    name: "Long speed",
+    kind: "hard",
+    why:
+      "The 400 is a sprint that sends you a bill at the end. Running these at your goal pace means race day feels like something you've already done instead of something you're figuring out.",
+    reps: {
+      gpp: [{ d: 300, label: "3 × 300m, a couple seconds per 100 slower than your goal 400 pace", rest: "8 to 10 minutes" }],
+      spp: [{ d: 300, label: "3 × 300m right at your goal 400 pace", rest: "10 minutes" }],
+      precomp: [{ d: 350, label: "2 × 350m, a half second per 100 faster than goal 400 pace", rest: "15 to 20 minutes" }],
+      comp: [
+        { d: 300, label: "1 × 300m all out from the blocks, timed", rest: "20 minutes" },
+        { d: 150, label: "1 × 150m hard", rest: "done" },
+      ],
+      peak: [
+        { d: 300, label: "1 × 300m, wait 45 seconds, then 1 × 100m — a rehearsal of the end of the race", rest: "done" },
+      ],
+    },
+  },
+  hills: {
+    name: "Hills",
+    kind: "hard",
+    why:
+      "The hill makes you push at the right angle without anyone having to tell you how, and it's a lot kinder on hamstrings than flat sprinting.",
+    reps: {
+      gpp: [
+        { d: 20, label: "8 × 20m up the hill, all out", rest: "walk down slowly, then 3 to 4 minutes" },
+        { d: 20, label: "4 × 20m on the flat from a 3-point start", rest: "3 minutes" },
+      ],
+      spp: [
+        { d: 30, label: "6 × 30m up the hill, all out", rest: "walk down, then 4 minutes" },
+        { d: 20, label: "3 × 20m on the flat, free", rest: "3 minutes" },
+      ],
+    },
+  },
+  resisted: {
+    name: "Resisted sprints",
+    kind: "hard",
+    why:
+      "Pulling against resistance builds the force you push into the track. The free sprints right afterward are not a cool-down — they're where your body applies what it just learned.",
+    reps: {
+      gpp: [
+        {
+          d: 20,
+          label: "6 × 20m on the ExerGenie set heavy — clearly slowed, but still sprinting, not marching",
+          rest: "4 minutes",
+        },
+        { d: 20, label: "3 × 20m free with no resistance", rest: "4 minutes" },
+      ],
+      spp: [
+        { d: 20, label: "6 × 20m on the ExerGenie set light — you should barely feel it", rest: "3 minutes" },
+        { d: 30, label: "4 × release runs — partner holds the belt for 10m, lets go, you sprint 20m free", rest: "3 minutes" },
+      ],
+    },
+  },
+};
+
+const EASY_RUN = {
+  e100: { text: "2 sets of 10 × 100m on the grass at about two thirds effort. 30 seconds between runs, 3 minutes between sets.", m: 2000 },
+  e200: { text: "2 sets of 10 × 100m on the grass at about two thirds effort. 30 seconds between runs, 3 minutes between sets.", m: 2000 },
+  e400: { text: "3 sets of 300m, 200m, 100m on the grass at about two thirds effort. 45 seconds between runs, 3 minutes between sets.", m: 1800 },
+};
+const easyRunFor = (ev, phase) => {
+  if (phase === "comp" || phase === "peak")
+    return ev === "e400"
+      ? { text: "2 sets of 300m, 200m, 100m on the grass at about two thirds effort. 45 seconds between runs, 3 minutes between sets.", m: 1200 }
+      : { text: "12 × 100m on the grass at about two thirds effort, 30 seconds between runs.", m: 1200 };
+  if (ev === "e400" && (phase === "gpp" || phase === "spp"))
+    return { text: EASY_RUN.e400.text + " 400 runners carry more of this than anyone — it's where your base comes from.", m: 2400 };
+  return EASY_RUN[ev];
+};
+
+/* ---------- after the track ---------- */
+const AFTER = {
+  gpp: [
+    "Lift: trap bar squat 4 × 8, Romanian deadlift 3 × 8, Nordic hamstring curls 3 × 5 with a partner holding your ankles, calf raises 3 × 12. Stop every set two or three reps short of failure.",
+    "Jumps, both feet, in place: 3 × 10 line hops, 3 × 8 tuck jumps.",
+    "Med ball throws: 3 overhead backward, 3 forward from between the legs, 3 scoop. Nine total, all out.",
+  ],
+  spp: [
+    "Lift heavy: trap bar squat 4 × 4, hip thrust 3 × 5, split squat 3 × 6 each leg.",
+    "Jumps: 4 sets of 5 over six low hurdles.",
+  ],
+  precomp: [
+    "Lift fast, not heavy: jump squats 4 × 3, push press 3 × 3, Nordic hamstring curls 2 × 4.",
+    "Jumps: 3 sets of 5 over low hurdles.",
+  ],
+  comp: [
+    "Lift, two moves only: trap bar squat 3 × 3 and hip thrust 3 × 5. Move the bar fast and stop well short of failure.",
+    "Jumps: about 30 landings, or skip them entirely if you race within three days.",
+  ],
+  peak: ["One short, light, fast lift — and nothing in the weight room at all inside three or four days of the meet."],
+  easy: [
+    "Bodyweight circuit, 3 rounds: 10 lunges each leg, 12 push-ups, 15 squats, 30-second plank, 10 easy jumps.",
+    "Med ball circuit at easy effort. Hurdle mobility, over and under, two sets of six.",
+    "No heavy lifting and no jumping today. Easy days only work if they stay easy.",
+  ],
+};
+
+/* ---------- which sessions exist for this athlete ---------- */
+const longSpeedKey = (ev) => (ev === "e400" ? "longspeed400" : "longspeed200");
+
+function sessionOptions(ev, phase) {
+  const out = ["starts", "topspeed"];
+  if (ev !== "e100") out.push(longSpeedKey(ev));
+  if (!(ev === "e400" && phase !== "comp")) out.push("speedend");
+  if (phase === "gpp" || phase === "spp") out.push("hills", "resisted");
+  return out;
+}
+
+const SPECIALS = {
+  easy: { name: "Easy day", kind: "easy" },
+  premeet: { name: "Pre-meet", kind: "light" },
+  meet: { name: "Meet", kind: "meet" },
+  off: { name: "Off", kind: "off" },
+};
+
+const nameOf = (id) => (LIB[id] ? LIB[id].name : SPECIALS[id] ? SPECIALS[id].name : "Not set");
+const kindOf = (id) => (LIB[id] ? LIB[id].kind : SPECIALS[id] ? SPECIALS[id].kind : "off");
+
+/* ---------- build one day's session ---------- */
+function buildSession(id, event, phase) {
+  if (id === "meet")
+    return {
+      name: "Meet day",
+      kind: "meet",
+      warm: WARM.meet,
+      reps: [],
+      after: [],
+      why: "Everything this week was for the next minute or less. Warm up long, stay warm, and trust what you've done.",
+    };
+  if (id === "premeet")
+    return {
+      name: "Pre-meet",
+      kind: "light",
+      warm: WARM.premeet,
+      reps: [
+        { d: 30, label: "2 × 30m buildups", rest: "walk back" },
+        { d: 20, label: "2 × starts out to 15m", rest: "3 minutes" },
+      ],
+      after: ["Nothing in the weight room. Hurdle mobility and go home."],
+      volume: 100,
+      why: "This is a rehearsal, not a workout. You want to leave the track feeling springy and a little bored.",
+    };
+  if (id === "off")
+    return {
+      name: "Off",
+      kind: "off",
+      warm: null,
+      reps: [],
+      after: [],
+      why: "Rest is when you actually get faster. The work already happened — this is where it takes hold.",
+    };
+  if (id === "easy") {
+    const r = easyRunFor(event, phase);
+    return {
+      name: "Easy day",
+      kind: "easy",
+      warm: WARM.easy,
+      reps: [{ d: 100, label: r.text, rest: "short, on purpose" }],
+      after: AFTER.easy,
+      easyVolume: r.m,
+      why:
+        "Easy days are how you pay for hard days. Nothing here should feel like a workout — it's blood flow, technique, and staying loose.",
+    };
+  }
+  const s = LIB[id];
+  if (!s) return null;
+  const reps = s.reps[phase] || s.reps.spp || s.reps.gpp;
+  const volume = reps.reduce((sum, r) => {
+    const m = r.label.match(/^(\d+)\s*×/);
+    return sum + (m ? parseInt(m[1], 10) : 1) * r.d;
+  }, 0);
+  return { name: s.name, kind: "hard", warm: WARM.hard, reps, after: AFTER[phase] || AFTER.spp, volume, why: s.why };
+}
+
+/* ---------- default weeks ---------- */
+const TEMPLATES = {
+  gpp: ["hills", "easy", "resisted", "easy", "topspeed", "off", "off"],
+  spp: ["starts", "easy", "topspeed", "easy", "speedend", "off", "off"],
+  precomp: ["speedend", "easy", "starts", "easy", "premeet", "meet", "off"],
+  comp: ["topspeed", "easy", "starts", "easy", "premeet", "meet", "off"],
+  peak: ["topspeed", "easy", "easy", "easy", "premeet", "meet", "off"],
+};
+const defaultWeek = (event, phase) => {
+  const opts = sessionOptions(event, phase);
+  return TEMPLATES[phase].map((id) => {
+    if (LIB[id] && !opts.includes(id)) {
+      if (id === "speedend" && event === "e400") return longSpeedKey(event);
+      return opts[0];
+    }
+    return id;
+  });
+};
+
+/* ---------- race models ---------- */
+const SPLIT_MODEL = {
+  e100: [
+    { at: "30m", f: 0.36, cue: "Push. Feet driving back behind you. Let yourself come up gradually — don't force it." },
+    { at: "60m", f: 0.628, cue: "Tall now. Pick your knee up and put your foot down under you. This is your fastest point." },
+    { at: "100m", f: 1, cue: "Fast is relaxed. Loose jaw, loose hands. Do not reach for the line." },
+  ],
+  e200: [
+    { at: "100m", f: 0.5145, cue: "Attack the curve. Lean into it, keep your inside arm tight." },
+    { at: "200m", f: 1, cue: "Stay relaxed from 100 to 130, then drive the last 70 home." },
+  ],
+  e400: [
+    { at: "100m", f: 0.236, cue: "Get out clean, then back off. Nothing here is free." },
+    { at: "200m", f: 0.476, cue: "Float the backstretch. This is the cheapest speed in the whole race." },
+    { at: "300m", f: 0.724, cue: "Attack the last curve before it attacks you." },
+    { at: "400m", f: 1, cue: "Arms. Everyone slows down here — you just slow down less." },
+  ],
+};
+
+/* ============================================================
+   UI pieces
+   ============================================================ */
+
+function Crest({ logo, size = 38 }) {
+  if (!logo) return null;
+  return <img src={logo} alt="Wenatchee High School Panthers" className="crest" style={{ maxHeight: size }} />;
+}
+
+function LaneRow({ n, dist, label, rest, max }) {
+  const w = Math.max(10, Math.min(100, (dist / max) * 100));
+  return (
+    <div className="lane">
+      <div className="lane-num">{n}</div>
+      <div className="lane-body">
+        <p className="lane-label">{label}</p>
+        <div className="lane-track">
+          <span className="lane-fill" style={{ width: `${w}%` }} />
+          <span className="lane-dist">{dist}m</span>
+        </div>
+        <p className="lane-rest">Rest {rest}</p>
+      </div>
+    </div>
+  );
+}
+
+function SessionView({ s }) {
+  if (!s) return null;
+  const maxD = Math.max(120, ...s.reps.map((r) => r.d));
+  return (
+    <>
+      {s.warm && (
+        <section className="panel">
+          <h3 className="h-sec">Warm up</h3>
+          <p className="body">{s.warm}</p>
+        </section>
+      )}
+
+      {s.reps.length > 0 && (
+        <section className="panel">
+          <h3 className="h-sec">On the track</h3>
+          <div className="lanes">
+            {s.reps.map((r, i) => (
+              <LaneRow key={i} n={i + 1} dist={r.d} label={r.label} rest={r.rest} max={maxD} />
+            ))}
+          </div>
+          {s.volume != null && (
+            <div className="volume">
+              <span className="volume-n">{s.volume}</span>
+              <span className="volume-l">meters of full-speed running</span>
+            </div>
+          )}
+          {s.easyVolume && (
+            <div className="volume volume-low">
+              <span className="volume-n">{s.easyVolume}</span>
+              <span className="volume-l">easy meters — getting tired here is fine</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      {s.after.length > 0 && (
+        <section className="panel">
+          <h3 className="h-sec">After the track</h3>
+          <ul className="list">
+            {s.after.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="panel panel-outline">
+        <h3 className="h-sec">Why you're doing this</h3>
+        <p className="body">{s.why}</p>
+      </section>
+    </>
+  );
+}
+
+function SessionPicker({ event, phase, value, onPick }) {
+  const opts = [...sessionOptions(event, phase), "easy", "premeet", "meet", "off"];
+  return (
+    <div className="chips">
+      {opts.map((id) => (
+        <button key={id} className={`chip ${value === id ? "on" : ""}`} onClick={() => onPick(id)}>
+          {nameOf(id)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Today ---------- */
+function Today({ board, event, coach, setDay, setNote }) {
+  const i = todayIndex();
+  const id = board.plan[i];
+  const s = buildSession(id, event, board.phase);
+  const note = board.notes[i];
+  const ev = EVENTS.find((e) => e.id === event);
+
+  return (
+    <div className="stack">
+      <section className={`panel panel-purple hero hero-${kindOf(id)}`}>
+        <div className="hero-top">
+          <span className="hero-eyebrow">{DAYS[i]}</span>
+          <span className="hero-eyebrow">{ev.full}</span>
+        </div>
+        <h2 className="hero-title">{s ? s.name : "Nothing posted yet"}</h2>
+        <span className="hero-kind">
+          {kindOf(id) === "hard" ? "Hard day" : kindOf(id) === "easy" ? "Easy day" : nameOf(id)}
+        </span>
+      </section>
+
+      {note && (
+        <section className="panel panel-note">
+          <h3 className="h-sec">From coach</h3>
+          <p className="body">{note}</p>
+        </section>
+      )}
+
+      {coach && (
+        <section className="panel panel-coach">
+          <h3 className="h-sec">Change today</h3>
+          <SessionPicker event={event} phase={board.phase} value={id} onPick={(v) => setDay(i, v)} />
+          <input
+            className="input input-note"
+            placeholder="Note for the team — sprinklers on, meet moved, anything"
+            value={note || ""}
+            onChange={(e) => setNote(i, e.target.value)}
+          />
+        </section>
+      )}
+
+      <SessionView s={s} />
+
+      {s && s.kind === "hard" && (
+        <p className="fine">
+          If something hurts rather than just aches, stop and tell a coach or the trainer. Pain is not a rep you push
+          through.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Week ---------- */
+function Week({ board, event, coach, setDay, setNote, setPhase, resetWeek, logo, setLogo }) {
+  const [open, setOpen] = useState(null);
+  const i = todayIndex();
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="row-head">
+          <h3 className="h-sec">This week</h3>
+          {coach && (
+            <button className="btn-ghost" onClick={resetWeek}>
+              Reset to usual week
+            </button>
+          )}
+        </div>
+        <div className="week">
+          {DAYS.map((d, n) => {
+            const id = board.plan[n];
+            const isOpen = open === n;
+            return (
+              <div key={d} className={`day day-${kindOf(id)} ${n === i ? "day-today" : ""}`}>
+                <button
+                  className="day-main"
+                  onClick={() => coach && setOpen(isOpen ? null : n)}
+                  disabled={!coach}
+                >
+                  <span className="day-name">{d}</span>
+                  <span className="day-body">
+                    <span className="day-title">{nameOf(id)}</span>
+                    {board.notes[n] && <span className="day-note">{board.notes[n]}</span>}
+                  </span>
+                  <span className="day-kind">
+                    {kindOf(id) === "hard" ? "Hard" : kindOf(id) === "easy" ? "Easy" : nameOf(id)}
+                  </span>
+                </button>
+                {coach && isOpen && (
+                  <div className="day-edit">
+                    <SessionPicker
+                      event={event}
+                      phase={board.phase}
+                      value={id}
+                      onPick={(v) => {
+                        setDay(n, v);
+                        setOpen(null);
+                      }}
+                    />
+                    <input
+                      className="input input-note"
+                      placeholder={`Note for ${d}`}
+                      value={board.notes[n] || ""}
+                      onChange={(e) => setNote(n, e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {coach ? (
+          <p className="note">Tap any day to change it. Everyone on the team sees the update.</p>
+        ) : (
+          <p className="fine">Coach posts this. If it changed today, it changed here too.</p>
+        )}
+      </section>
+
+      {coach && (
+        <section className="panel panel-coach">
+          <h3 className="h-sec">Time of year</h3>
+          <div className="phases">
+            {PHASES.map((p) => (
+              <button key={p.id} className={`phase ${board.phase === p.id ? "on" : ""}`} onClick={() => setPhase(p.id)}>
+                <span className="phase-l">{p.label}</span>
+                <span className="phase-w">{p.when}</span>
+              </button>
+            ))}
+          </div>
+          <p className="note">
+            This sets how much and how hard every session runs. Changing it doesn't rewrite the week — use reset for
+            that.
+          </p>
+        </section>
+      )}
+
+      <section className="panel panel-outline">
+        <h3 className="h-sec">The two rules behind all of it</h3>
+        <ol className="rules">
+          <li>
+            <strong>Every day is either hard or easy.</strong> Full speed, or genuinely relaxed. The medium pace in
+            between gives you all the tiredness of hard training and almost none of the improvement.
+          </li>
+          <li>
+            <strong>Never two hard days in a row.</strong> Three a week at most. During the season a meet counts as one
+            of them.
+          </li>
+        </ol>
+      </section>
+
+      {coach && <LogoSlot logo={logo} setLogo={setLogo} />}
+    </div>
+  );
+}
+
+/* ---------- logo slot ---------- */
+function readLogoFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("not an image"));
+      img.onload = () => {
+        const max = 256;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/png"));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function LogoSlot({ logo, setLogo }) {
+  const [err, setErr] = useState("");
+  const onPick = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr("");
+    try {
+      const url = await readLogoFile(file);
+      setLogo(url);
+      store.set(LOGO_KEY, url, true);
+    } catch (_) {
+      setErr("That file didn't load. Try a PNG or JPG.");
+    }
+  };
+  return (
+    <section className="panel panel-coach">
+      <h3 className="h-sec">Team logo</h3>
+      <div className="logo-slot">
+        {logo && (
+          <div className="logo-preview">
+            <Crest logo={logo} size={52} />
+          </div>
+        )}
+        <div className="logo-copy">
+          <p className="body">
+            {logo ? "The Panthers mark shows in the header on every phone." : "Load the Panthers mark and it shows in the header on every phone."}
+          </p>
+          <div className="logo-actions">
+            <label className="btn btn-sm">
+              {logo ? "Replace logo" : "Choose logo file"}
+              <input type="file" accept="image/*" onChange={onPick} className="hide-input" />
+            </label>
+            {logo && (
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setLogo(null);
+                  store.set(LOGO_KEY, null, true);
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {err && <p className="note">{err}</p>}
+        </div>
+      </div>
+      <p className="fine">A PNG with a transparent background sits best on the purple header.</p>
+    </section>
+  );
+}
+
+/* ---------- Times ---------- */
+function Times({ event }) {
+  const [log, setLog] = useState([]);
+  const [ready, setReady] = useState(false);
+  const [ev, setEv] = useState(event);
+  const [val, setVal] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const saved = await store.get(LOG_KEY);
+      setLog(Array.isArray(saved) ? saved : []);
+      setReady(true);
+    })();
+  }, []);
+  useEffect(() => setEv(event), [event]);
+
+  const save = (next) => {
+    setLog(next);
+    store.set(LOG_KEY, next);
+  };
+  const add = () => {
+    const t = parseTime(val);
+    if (t == null) return;
+    save([{ id: Date.now(), ev, t, date: new Date().toISOString().slice(0, 10) }, ...log]);
+    setVal("");
+  };
+
+  const labelFor = (id) =>
+    ({ fly10: "Fly 10", fly20: "Fly 20", e60: "60m", e100: "100m", e200: "200m", e400: "400m" }[id] || id);
+  const best = {};
+  log.forEach((e) => {
+    if (best[e.ev] == null || e.t < best[e.ev]) best[e.ev] = e.t;
+  });
+  const pr100 = best.e100;
+
+  return (
+    <div className="stack">
+      <section className="panel panel-purple">
+        <h3 className="h-sec h-on-purple">Your best times</h3>
+        {Object.keys(best).length === 0 ? (
+          <p className="empty">Add a time below and it shows up here. Time everything — what gets timed gets faster.</p>
+        ) : (
+          <div className="pr-grid">
+            {["fly10", "fly20", "e60", "e100", "e200", "e400"]
+              .filter((k) => best[k] != null)
+              .map((k) => (
+                <div key={k} className="pr">
+                  <span className="pr-n">{fmtTime(best[k])}</span>
+                  <span className="pr-l">{labelFor(k)}</span>
+                </div>
+              ))}
+          </div>
+        )}
+        <p className="fine fine-on-purple">These stay on your phone. Nobody else sees them.</p>
+      </section>
+
+      <section className="panel">
+        <h3 className="h-sec">Add a time</h3>
+        <div className="chips">
+          {["fly10", "fly20", "e60", "e100", "e200", "e400"].map((k) => (
+            <button key={k} className={`chip ${ev === k ? "on" : ""}`} onClick={() => setEv(k)}>
+              {labelFor(k)}
+            </button>
+          ))}
+        </div>
+        <div className="add-row">
+          <input
+            className="input"
+            inputMode="decimal"
+            placeholder="11.42 or 1:02.7"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+          />
+          <button className="btn" onClick={add}>
+            Save
+          </button>
+        </div>
+      </section>
+
+      {pr100 && (
+        <section className="panel">
+          <h3 className="h-sec">Your easy-day pace</h3>
+          <p className="big">
+            {(pr100 * 1.33).toFixed(1)} to {(pr100 * 1.43).toFixed(1)} seconds
+          </p>
+          <p className="body">
+            That's what a 100 on the grass should take on an easy day, based on your {fmtTime(pr100)}. Run them faster
+            than this and the easy day stops doing its job.
+          </p>
+        </section>
+      )}
+
+      <section className="panel">
+        <h3 className="h-sec">Everything you've logged</h3>
+        {!ready ? (
+          <p className="empty">Loading…</p>
+        ) : log.length === 0 ? (
+          <p className="empty">Nothing yet.</p>
+        ) : (
+          <ul className="log">
+            {log.map((e) => (
+              <li key={e.id}>
+                <span className="log-ev">{labelFor(e.ev)}</span>
+                <span className="log-t">
+                  {fmtTime(e.t)}
+                  {best[e.ev] === e.t && <em className="pr-badge">Best</em>}
+                </span>
+                <span className="log-d">{e.date}</span>
+                <button className="x" onClick={() => save(log.filter((x) => x.id !== e.id))} aria-label="Delete">
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* ---------- Race ---------- */
+function Race({ event }) {
+  const [goal, setGoal] = useState("");
+  const g = parseTime(goal);
+  const marks = SPLIT_MODEL[event];
+  const ev = EVENTS.find((e) => e.id === event);
+
+  return (
+    <div className="stack">
+      <section className="panel panel-purple">
+        <h3 className="h-sec h-on-purple">Your {ev.full} plan</h3>
+        <input
+          className="input input-dark"
+          inputMode="decimal"
+          placeholder={event === "e400" ? "Goal time, like 50.5" : "Goal time, like 11.20"}
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+        />
+        <p className="hero-sub">Put in the time you're chasing and the splits fill in.</p>
+      </section>
+
+      <section className="panel">
+        <h3 className="h-sec">How it should feel, mark by mark</h3>
+        <div className="splits">
+          {marks.map((m, idx) => {
+            const c = g ? g * m.f : null;
+            const prev = idx === 0 || !g ? 0 : g * marks[idx - 1].f;
+            return (
+              <div key={m.at} className="split">
+                <div className="split-head">
+                  <span className="split-at">{m.at}</span>
+                  <span className="split-t">{c ? c.toFixed(2) : "—"}</span>
+                </div>
+                {c && <span className="split-seg">that piece on its own: {(c - prev).toFixed(2)}</span>}
+                <p className="split-cue">{m.cue}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {event === "e400" && g && (
+        <section className="panel panel-outline">
+          <h3 className="h-sec">Your two halves</h3>
+          <p className="big">
+            {(g * 0.476).toFixed(2)} / {(g - g * 0.476).toFixed(2)}
+          </p>
+          <p className="body">
+            First 200 and second 200. About two to two and a half seconds between them is a well-run race. Closer than
+            that and you left time out there on the first half. Further apart and you went out too hard and paid for it
+            coming home.
+          </p>
+        </section>
+      )}
+
+      <section className="panel">
+        <h3 className="h-sec">The last ten days before a big meet</h3>
+        <ol className="rules">
+          <li>
+            <strong>Ten to seven days out:</strong> your last genuinely hard session. Nothing after this makes you fitter
+            by race day.
+          </li>
+          <li>
+            <strong>Five to four days out:</strong> the last full-speed running. Short, sharp, timed.
+          </li>
+          <li>
+            <strong>You'll do a lot less</strong> over these ten days, but what you do is still fast. Feeling slightly
+            under-worked beats feeling fit and flat.
+          </li>
+          <li>
+            <strong>Nothing new.</strong> No new lift, no new drill, no new spikes, no new warmup.
+          </li>
+          <li>
+            <strong>No weight room inside three or four days.</strong>
+          </li>
+        </ol>
+      </section>
+
+      <section className="panel">
+        <h3 className="h-sec">Meet-day warmup</h3>
+        <p className="body">{WARM.meet}</p>
+      </section>
+    </div>
+  );
+}
+
+/* ============================================================
+   App
+   ============================================================ */
+const TABS = [
+  { id: "today", label: "Today" },
+  { id: "week", label: "Week" },
+  { id: "times", label: "Times" },
+  { id: "race", label: "Race" },
+];
+
+function App() {
+  const [tab, setTab] = useState("today");
+  const [event, setEvent] = useState("e100");
+  const [coach, setCoach] = useState(false);
+  const [logo, setLogo] = useState(null);
+  const [board, setBoard] = useState({ phase: "comp", plan: TEMPLATES.comp, notes: ["", "", "", "", "", "", ""] });
+  const [loaded, setLoaded] = useState(false);
+
+  const loadBoard = useCallback(async () => {
+    const b = await store.get(BOARD_KEY, true);
+    if (b && Array.isArray(b.plan) && b.plan.length === 7) setBoard(b);
+    const l = await store.get(LOGO_KEY, true);
+    if (typeof l === "string" && l.startsWith("data:image")) setLogo(l);
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    loadBoard();
+  }, [loadBoard]);
+  useEffect(() => {
+    if (loaded && tab === "today") loadBoard();
+  }, [tab]); // eslint-disable-line
+
+  useEffect(() => {
+    (async () => {
+      const e = await store.get("panther:event:v2");
+      if (e) setEvent(e);
+    })();
+  }, []);
+  useEffect(() => {
+    store.set("panther:event:v2", event);
+  }, [event]);
+
+  const push = (next) => {
+    setBoard(next);
+    store.set(BOARD_KEY, next, true);
+  };
+  const setDay = (i, id) => {
+    const plan = [...board.plan];
+    plan[i] = id;
+    push({ ...board, plan });
+  };
+  const setNote = (i, text) => {
+    const notes = [...board.notes];
+    notes[i] = text;
+    push({ ...board, notes });
+  };
+  const setPhase = (phase) => push({ ...board, phase });
+  const resetWeek = () =>
+    push({ ...board, plan: defaultWeek(event, board.phase), notes: ["", "", "", "", "", "", ""] });
+
+  return (
+    <div className="app">
+      <style>{CSS}</style>
+
+      <header className="top">
+        <div className="brand">
+          <Crest logo={logo} />
+          <span className="brand-text">
+            <span className="brand-name">Panther Speed</span>
+            <span className="brand-sub">Wenatchee High School Track &amp; Field</span>
+          </span>
+          <button
+            className={`coach-toggle ${coach ? "on" : ""}`}
+            onClick={() => setCoach(!coach)}
+            aria-pressed={coach}
+          >
+            Coach
+          </button>
+        </div>
+        <div className="events">
+          {EVENTS.map((e) => (
+            <button key={e.id} className={`event ${event === e.id ? "on" : ""}`} onClick={() => setEvent(e.id)}>
+              {e.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <main className="main">
+        {tab === "today" && (
+          <Today board={board} event={event} coach={coach} setDay={setDay} setNote={setNote} />
+        )}
+        {tab === "week" && (
+          <Week
+            board={board}
+            event={event}
+            coach={coach}
+            setDay={setDay}
+            setNote={setNote}
+            setPhase={setPhase}
+            resetWeek={resetWeek}
+            logo={logo}
+            setLogo={setLogo}
+          />
+        )}
+        {tab === "times" && <Times event={event} />}
+        {tab === "race" && <Race event={event} />}
+      </main>
+
+      <nav className="nav">
+        {TABS.map((t) => (
+          <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+/* ============================================================
+   CSS
+   ============================================================ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Karla:wght@400;500;700&display=swap');
+
+.app {
+  --ink: #1A0B26;
+  --purple: #4B1868;
+  --purple-2: #380F4F;
+  --purple-lift: #7134A0;
+  --gold: #EEBF00;
+  --gold-deep: #9C7C00;
+  --chalk: #F3F0F6;
+  --paper: #FFFFFF;
+  --mist: #7B6889;
+  --line: #E4DCEB;
+  --display: 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --body: 'Karla', system-ui, -apple-system, sans-serif;
+
+  font-family: var(--body);
+  background: var(--chalk);
+  color: var(--ink);
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 84px;
+  -webkit-font-smoothing: antialiased;
+}
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app p, .app h2, .app h3, .app ul, .app ol { margin: 0; }
+
+/* header */
+.top {
+  background: var(--purple-2);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 46px, rgba(238,191,0,.13) 46px 47px);
+  color: #fff; padding: 16px 18px 0; position: sticky; top: 0; z-index: 20;
+  box-shadow: 0 2px 0 var(--gold);
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.crest { display: block; width: auto; object-fit: contain; }
+.brand-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.brand-name { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: .045em; text-transform: uppercase; line-height: 1; }
+.brand-sub { font-size: 10.5px; color: #C6ADD6; margin-top: 3px; }
+.coach-toggle {
+  border: 1px solid rgba(255,255,255,.28); background: none; color: #C6ADD6;
+  font-family: var(--body); font-size: 12px; padding: 6px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto;
+}
+.coach-toggle.on { background: var(--gold); border-color: var(--gold); color: var(--ink); font-weight: 700; }
+
+.events { display: flex; gap: 6px; margin-top: 14px; }
+.events .event {
+  flex: 1; border: 0; cursor: pointer; background: rgba(255,255,255,.09); color: #D4C2E2;
+  font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: .04em;
+  padding: 9px 0 8px; border-radius: 3px 3px 0 0; border-bottom: 3px solid transparent;
+}
+.events .event.on { background: var(--gold); color: var(--ink); border-bottom-color: var(--gold-deep); }
+
+/* layout */
+.main { padding: 16px 14px 0; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 16px; }
+.panel-purple {
+  background: var(--purple); border-color: var(--purple); color: #fff;
+  background-image: repeating-linear-gradient(115deg, transparent 0 22px, rgba(255,255,255,.045) 22px 23px);
+}
+.panel-outline { background: transparent; border: 1px solid var(--purple-lift); border-left-width: 4px; }
+.panel-note { border-left: 4px solid var(--gold); }
+.panel-coach { border: 1px dashed var(--purple-lift); background: #FBF8FD; }
+
+.h-sec {
+  font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--gold-deep); margin-bottom: 10px;
+}
+.h-on-purple { color: var(--gold); }
+.row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.row-head .h-sec { margin-bottom: 10px; }
+
+.body { font-size: 14.5px; line-height: 1.62; color: #33203F; }
+.panel-purple .body { color: #E4D6EE; }
+.note {
+  font-size: 13px; line-height: 1.55; color: var(--purple); background: #F3E9F8;
+  border-left: 3px solid var(--gold); padding: 9px 11px; margin-top: 12px; border-radius: 0 3px 3px 0;
+}
+.fine { font-size: 12px; line-height: 1.55; color: var(--mist); padding: 4px 2px 6px; }
+.fine-on-purple { color: #C3A7D6; padding: 12px 0 0; }
+.empty { font-size: 14px; line-height: 1.6; color: #C3A7D6; }
+
+/* hero */
+.hero { padding: 20px 16px 22px; }
+.hero-top { display: flex; justify-content: space-between; }
+.hero-eyebrow { font-size: 11px; color: #C3A7D6; letter-spacing: .04em; }
+.hero-title { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1.02; margin-top: 8px; color: #fff; }
+.hero-kind {
+  display: inline-block; margin-top: 12px; font-family: var(--display); font-size: 12px;
+  letter-spacing: .12em; text-transform: uppercase; background: var(--gold); color: var(--ink);
+  padding: 4px 10px; border-radius: 2px;
+}
+.hero-easy .hero-kind, .hero-off .hero-kind { background: rgba(255,255,255,.16); color: #E4D6EE; }
+.hero-sub { font-size: 12.5px; color: #C3A7D6; margin-top: 10px; }
+
+/* controls */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 1px solid var(--line); background: var(--chalk); color: #4B3560;
+  font-family: var(--body); font-size: 13px; font-weight: 500; padding: 7px 12px;
+  border-radius: 999px; cursor: pointer;
+}
+.chip.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+.chip:focus-visible, .btn:focus-visible, .phase:focus-visible, .nav button:focus-visible,
+.events .event:focus-visible, .coach-toggle:focus-visible, .day-main:focus-visible {
+  outline: 2px solid var(--purple-lift); outline-offset: 2px;
+}
+.add-row { display: flex; gap: 8px; margin-top: 10px; }
+.input {
+  flex: 1; min-width: 0; width: 100%; border: 1px solid var(--line); background: var(--chalk);
+  padding: 11px 12px; border-radius: 3px; font-family: var(--display); font-size: 18px;
+  letter-spacing: .03em; color: var(--ink);
+}
+.input::placeholder { color: #A692B4; }
+.input:focus { outline: 2px solid var(--purple-lift); }
+.input-dark { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.24); color: #fff; }
+.input-dark::placeholder { color: #B79FCA; }
+.input-note { font-family: var(--body); font-size: 14px; letter-spacing: 0; margin-top: 10px; background: #fff; }
+.btn {
+  border: 0; background: var(--gold); color: var(--ink); font-family: var(--display); font-size: 14px;
+  font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 0 16px;
+  border-radius: 3px; cursor: pointer; height: 42px;
+}
+.btn-sm { display: inline-flex; align-items: center; height: 34px; }
+.hide-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.btn-ghost { border: 0; background: none; cursor: pointer; padding: 0; font-family: var(--body); font-size: 13px; color: var(--mist); text-decoration: underline; }
+.btn-ghost:hover { color: var(--purple); }
+
+/* lane ladder */
+.lanes { display: flex; flex-direction: column; }
+.lane { display: flex; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); }
+.lane:first-child { border-top: 0; padding-top: 2px; }
+.lane-num {
+  flex: 0 0 30px; height: 30px; background: var(--gold); color: var(--ink);
+  font-family: var(--display); font-weight: 700; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; border-radius: 2px;
+}
+.lane-body { flex: 1; min-width: 0; }
+.lane-label { font-size: 14.5px; line-height: 1.5; color: #2A1838; }
+.lane-track { position: relative; height: 20px; margin: 9px 0 6px; background: var(--chalk); border-radius: 2px; display: flex; align-items: center; }
+.lane-fill { display: block; height: 100%; background: var(--purple); border-radius: 2px; }
+.lane-dist { position: absolute; right: 8px; font-family: var(--display); font-size: 12px; letter-spacing: .08em; color: var(--purple); font-weight: 600; }
+.lane-rest { font-size: 12px; color: var(--mist); }
+.volume { display: flex; align-items: baseline; gap: 9px; margin-top: 14px; padding-top: 13px; border-top: 2px solid var(--gold); }
+.volume-n { font-family: var(--display); font-size: 34px; font-weight: 700; line-height: 1; color: var(--purple); }
+.volume-l { font-size: 12.5px; color: var(--mist); }
+.volume-low .volume-n { color: var(--mist); }
+
+.list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+.list li { font-size: 14px; line-height: 1.6; color: #33203F; padding-left: 14px; border-left: 2px solid var(--gold); }
+.rules { list-style: none; counter-reset: r; display: flex; flex-direction: column; gap: 12px; }
+.rules li { counter-increment: r; font-size: 14px; line-height: 1.6; color: #33203F; position: relative; padding-left: 26px; }
+.rules li::before { content: counter(r); position: absolute; left: 0; top: 1px; font-family: var(--display); font-weight: 700; font-size: 13px; color: var(--gold-deep); }
+.rules strong { color: var(--ink); }
+
+/* week */
+.week { display: flex; flex-direction: column; }
+.day { border-top: 1px solid var(--line); }
+.day:first-child { border-top: 0; }
+.day-main {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+  border: 0; background: none; padding: 13px 0; font-family: var(--body); cursor: pointer;
+}
+.day-main:disabled { cursor: default; }
+.day-today { background: linear-gradient(to right, #FBF6DE, transparent 70%); }
+.day-name { flex: 0 0 44px; font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: .05em; color: var(--ink); }
+.day-today .day-name { color: var(--gold-deep); }
+.day-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.day-title { font-size: 14.5px; color: #33203F; }
+.day-note { font-size: 12.5px; color: var(--mist); margin-top: 3px; }
+.day-kind { flex: 0 0 auto; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; margin-top: 1px; }
+.day-hard .day-kind { background: var(--purple); color: #fff; }
+.day-easy .day-kind { background: #EFE4F3; color: var(--purple); }
+.day-meet .day-kind { background: var(--gold); color: var(--ink); }
+.day-light .day-kind { background: #FBF0CE; color: var(--gold-deep); }
+.day-off .day-kind { background: var(--chalk); color: var(--mist); }
+.day-off .day-title { color: var(--mist); }
+.day-edit { padding: 0 0 14px; }
+
+.phases { display: flex; flex-direction: column; gap: 5px; }
+.phase {
+  display: flex; justify-content: space-between; align-items: baseline; border: 1px solid var(--line);
+  background: var(--chalk); cursor: pointer; padding: 10px 12px; border-radius: 3px;
+  text-align: left; font-family: var(--body);
+}
+.phase.on { background: var(--purple); border-color: var(--purple); }
+.phase-l { font-size: 14px; font-weight: 500; color: var(--ink); }
+.phase.on .phase-l { color: #fff; }
+.phase-w { font-size: 11.5px; color: var(--mist); }
+.phase.on .phase-w { color: var(--gold); }
+
+/* logo slot */
+.logo-slot { display: flex; gap: 14px; align-items: flex-start; }
+.logo-preview {
+  flex: 0 0 64px; height: 64px; display: flex; align-items: center; justify-content: center;
+  background: var(--purple-2); border-radius: 3px; padding: 6px;
+}
+.logo-copy { flex: 1; min-width: 0; }
+.logo-actions { display: flex; align-items: center; gap: 12px; margin-top: 11px; }
+
+/* times */
+.pr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; }
+.pr { display: flex; flex-direction: column; }
+.pr-n { font-family: var(--display); font-size: 25px; font-weight: 600; color: var(--gold); line-height: 1; }
+.pr-l { font-size: 11px; color: #C3A7D6; margin-top: 4px; letter-spacing: .04em; }
+.big { font-family: var(--display); font-size: 36px; font-weight: 700; color: var(--purple); line-height: 1; margin-bottom: 10px; }
+.log { list-style: none; display: flex; flex-direction: column; }
+.log li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.log li:first-child { border-top: 0; padding-top: 0; }
+.log-ev { flex: 0 0 58px; font-size: 12.5px; color: var(--mist); }
+.log-t { flex: 1; font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: .03em; }
+.pr-badge {
+  font-family: var(--body); font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  background: var(--gold); color: var(--ink); padding: 2px 5px; border-radius: 2px; margin-left: 8px; vertical-align: 3px;
+}
+.log-d { font-size: 12px; color: var(--mist); }
+.x { border: 0; background: none; color: #B5A3C1; font-size: 20px; cursor: pointer; padding: 0 2px; line-height: 1; }
+
+/* race */
+.splits { display: flex; flex-direction: column; }
+.split { padding: 13px 0; border-top: 1px solid var(--line); }
+.split:first-child { border-top: 0; padding-top: 0; }
+.split-head { display: flex; align-items: baseline; justify-content: space-between; }
+.split-at { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: .08em; color: var(--purple); }
+.split-t { font-family: var(--display); font-size: 27px; font-weight: 700; color: var(--ink); line-height: 1; }
+.split-seg { display: block; font-size: 11.5px; color: var(--mist); margin-top: 3px; }
+.split-cue { font-size: 14px; line-height: 1.55; color: #33203F; margin-top: 7px; }
+
+/* nav */
+.nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+  display: grid; grid-template-columns: repeat(4, 1fr); background: var(--ink);
+  border-top: 2px solid var(--gold); z-index: 30;
+}
+.nav button {
+  border: 0; background: none; cursor: pointer; padding: 15px 0 17px; font-family: var(--display);
+  font-size: 13px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase;
+  color: #9C87AD; border-top: 3px solid transparent; margin-top: -3px;
+}
+.nav button.on { color: var(--gold); border-top-color: var(--gold); }
+
+@media (prefers-reduced-motion: reduce) { .app * { transition: none !important; animation: none !important; } }
+`;
+
+
+/* ---------- start the app ---------- */
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
