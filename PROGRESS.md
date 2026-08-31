@@ -44,7 +44,8 @@ of the app already talks to storage through that one object.
 - **Coach mode isn't locked.** Any athlete can tap "Coach" and change the week.
   With a group of 15 this is probably fine. If it becomes a problem, a simple
   4-digit code is a 10-minute fix.
-- **First load takes about 2 seconds** while the browser reads the page. This is
-  the tradeoff for having no build tools. Acceptable at this size.
+- **`index.html` is now compiled output.** It is one 600KB file with React built
+  in and no internet dependencies. Don't hand-edit it — say what you want
+  changed and it gets rebuilt from source.
 - **Times are per-phone.** If an athlete gets a new phone, their logged times
   don't come with them.

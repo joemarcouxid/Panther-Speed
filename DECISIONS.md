@@ -38,3 +38,13 @@ missing and it's an isolated change.
 this account are published, so there's one place to find everything and one
 workflow to remember. Requires a public repo, which is fine for workout content
 but does mean the logo file is publicly downloadable.
+
+**Aug 2026 — No CDN, nothing loaded from the internet.** The first hosted build
+went blank on GitHub Pages. It relied on three files from unpkg, one of which
+was a 3MB compiler that turned the code into something browsers understand,
+every single time the page opened. Now that conversion happens once, ahead of
+time, and React is bundled directly into `index.html`. The page needs nothing
+but itself. It's a 600KB file, which is fine, and it works on bad track wifi.
+
+**Aug 2026 — The app says what broke.** If it ever fails to start it now prints
+the error on screen instead of showing a blank page.
