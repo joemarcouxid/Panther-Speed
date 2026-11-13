@@ -146,7 +146,7 @@
 
   <section class="pick" id="pick" hidden>
     <h2>What do you run?</h2>
-    <p>Pick your main event. You'll get a workout for it every day. You can change it any time.</p>
+    <p>Pick your main event and you'll get a workout for it every day. You can change it later.</p>
     <div class="events" id="eventList"></div>
   </section>
 
@@ -243,17 +243,17 @@
   /* ================= events + phases ================= */
 
   const EVENTS = {
-    "100": { label: "100 m", blurb: "Pure speed. Getting out fast and holding top speed." },
-    "200": { label: "200 m", blurb: "Speed around the curve, then holding it to the line." },
-    "400": { label: "400 m", blurb: "Speed plus the strength to hold it when it hurts." }
+    "100": { label: "100 m" },
+    "200": { label: "200 m" },
+    "400": { label: "400 m" }
   };
 
   const PHASES = {
-    summer: { name: "Summer base", blurb: "Build muscle and good acceleration. Lots of easy running, short fast sprints." },
-    fall:   { name: "Fall build", blurb: "Get strong. Sprints get a little longer and faster." },
-    winter: { name: "Winter pre-season", blurb: "Speed and race practice. Early meets may start." },
-    season: { name: "Track season", blurb: "Races are the hardest work now. Less volume, very high quality." },
-    champ:  { name: "Championships", blurb: "Rest up and stay sharp. Nothing new." }
+    summer: { name: "Summer base", blurb: "Lifting to build muscle, short sprints, and plenty of easy running." },
+    fall:   { name: "Fall build", blurb: "Lifting gets heavier and the sprints get a bit longer." },
+    winter: { name: "Winter pre-season", blurb: "More full-speed running and some race practice. A few meets may start." },
+    season: { name: "Track season", blurb: "Meets are your hard days now, so practices are shorter." },
+    champ:  { name: "Championships", blurb: "Big meets. Practices are short and easy so you're fresh." }
   };
   const phaseByDate = (d) => {
     const m = d.getMonth() + 1;
@@ -269,20 +269,20 @@
   const HOW = [
     ["exergenie sprints, heavy", "ExerGenie line clipped to your belt, set heavy enough that you move at about half speed. Stay low, push the track back hard. Rest fully — this is strength work."],
     ["resisted sprints, light", "ExerGenie or Activator belt set light. You should barely feel it slowing you. If it turns into a slow march, it's too heavy."],
-    ["free sprints", "Same distance, no resistance, right after the resisted ones. You'll feel fast — that's the point."],
+    ["free sprints", "Same distance, no resistance, right after the resisted ones. You'll probably feel quick."],
     ["release run", "Wear the Activator belt. A partner holds it and resists while you drive for 10 m, then lets go and you sprint 20 m more."],
     ["crouch start", "Three-point start: one hand down, feet staggered. Push out low and rise naturally over the first 10–15 m."],
     ["block start", "From the blocks, on a 'set' and a clap or 'go'. Push both blocks back hard and stay low for the first few steps."],
     ["mini hurdle", "8–10 mini hurdles about 6.5–7 ft apart. Run through fast and tall, quick feet, one step between each."],
     ["flying", "Build up over 30 m, then hold top speed through the timed part. Only the fast part counts."],
     ["sprint-float-sprint", "Sprint 20 m, hold speed but relax for 20 m (float), then sprint the last 20 m."],
-    ["bend run", "Start on the curve and run into the straight — like the 200. Lean slightly from your ankles into the turn."],
-    ["150s", "Start on the curve, about 95%. Hold your form to the line. Full rest."],
-    ["200 practice", "Run a 200 like a race at about 95%. Time it."],
-    ["300 + 100", "300 at 400 race pace, rest exactly 60 s, then 100 as fast as you can hold form. That's the last 100 of a 400."],
-    ["race-pace 300", "300 at your 400 race pace. Relaxed, fast, tall."],
-    ["300s", "Hard 300s at about 95%. These hurt. That's what the long rest is for."],
-    ["fast", "About 95% — fast, but relaxed in your face and shoulders. Hold form to the end."],
+    ["bend run", "Start on the curve and run into the straight. Lean slightly into the turn."],
+    ["150s", "Start on the curve and run about 95%. Take the full rest."],
+    ["200 practice", "Run a 200 at about 95% and time it."],
+    ["300 + 100", "Run 300 at your 400 race pace, rest 60 seconds, then run a fast 100."],
+    ["race-pace 300", "Run 300 at your 400 race pace."],
+    ["300s", "300s at about 95%. Take the full rest between them."],
+    ["fast", "About 95%: fast, but relaxed in your face and shoulders."],
     ["easy 100s", "On grass at about 70% — smooth and springy, not sprinting. Walk 30 s between."],
     ["easy 200s", "On grass at about 70% — smooth, not sprinting. Walk 1 min between."],
     ["circuit", "Go through every exercise, rest a minute, go again. Smooth, not a race."],
@@ -386,9 +386,9 @@
     }
   };
   const EVENT_DAY_INFO = {
-    "100": { focus: "Speed endurance", why: "Holding top speed for the last 30 meters. Everyone slows down — this is how you slow down least." },
-    "200": { focus: "200 speed", why: "Running the curve fast and holding speed all the way to the line." },
-    "400": { focus: "400 strength", why: "Staying fast when it starts to hurt. This is what wins the last 100 of a 400." }
+    "100": { focus: "Longer sprints", why: "A few sprints a bit longer than 60 m, with plenty of rest in between." },
+    "200": { focus: "Curve runs", why: "A few fast runs, most starting on the curve, with plenty of rest." },
+    "400": { focus: "Long sprints", why: "A few long, fast reps with a lot of rest. This is the toughest day of the week." }
   };
 
   function tempo(ev, ph) {
@@ -413,36 +413,36 @@
   function weekTemplate(ev, ph) {
     const liftA = LIFT_A[ph], liftB = LIFT_B[ph];
     return [
-      { id: "accel", type: "high", focus: "Acceleration", why: "Getting out fast. The first 30 meters of every race.",
+      { id: "accel", type: "high", focus: "Acceleration", why: "Starts and the first 30 meters of the race.",
         blocks: [{ h: "On the track", items: ACCEL[ph] }, { h: "Jumps + throws", items: ACCEL_JUMPS[ph] }, { h: "Weight room, after", items: liftA }].filter((b) => b.items.length),
         whyLong: ph === "summer"
-          ? "Heavy resisted sprints build pushing strength. Free sprints right after let you feel that strength at full speed."
-          : "Short starts with full rest teach you to push hard and stay low. Light resistance keeps good sprint form.",
+          ? "The ExerGenie makes you push harder. Running without it right after helps carry that over to normal sprinting."
+          : "Short sprints with lots of rest, so each one is fast. Light resistance helps you stay low and push.",
         src: ph === "summer" ? "Petrakos 2016 · Alcaraz 2018" : "Haugen 2019 · ALTIS" },
-      { id: "easyA", type: "low", focus: "Easy day", why: "Recover so Wednesday can be fast. Nothing hard today.",
+      { id: "easyA", type: "low", focus: "Easy day", why: "Nice and easy today so you're fresh tomorrow.",
         blocks: [{ h: "Run", items: [tempo(ev, ph)] }, { h: "Circuit", items: CIRCUIT_A(ph) }],
-        whyLong: "Easy days keep your engine and muscles in shape without tiring you out for the next hard day.", src: "Francis high/low" },
-      { id: "maxv", type: "high", focus: "Top speed", why: "Your fastest running. The middle of the 100, the straight of the 200.",
+        whyLong: "Easy running keeps you in shape without wearing you out for tomorrow.", src: "Francis high/low" },
+      { id: "maxv", type: "high", focus: "Top speed", why: "Running as fast as you can, with lots of rest in between.",
         blocks: [{ h: "On the track", items: MAXV[ph] }, { h: "Jumps", items: MAXV_JUMPS[ph] }, { h: "Weight room, after", items: liftB }].filter((b) => b.items.length),
-        whyLong: "Top speed only improves by running at top speed, fresh, with full rest. Mini hurdles teach quick, tall steps.", src: "Haugen 2019 · Dodoo / ALTIS" },
-      { id: "easyB", type: "low", focus: "Easy day", why: "Recover so Friday can be your best.",
+        whyLong: "You get faster at top speed by running at top speed while you're rested. The mini hurdles help with quick, tall steps.", src: "Haugen 2019 · Dodoo / ALTIS" },
+      { id: "easyB", type: "low", focus: "Easy day", why: "Easy again today. Tomorrow is a hard one.",
         blocks: [{ h: "Run", items: [tempo(ev, ph)] }, { h: "After", items: CIRCUIT_B(ph) }],
-        whyLong: ev === "400" ? "400 runners need more easy running than 100/200 runners — the 400 uses your aerobic system a lot more." : "Easy running and mobility help you recover and keep your hips moving well.",
+        whyLong: ev === "400" ? "400 runners do a bit more easy running than 100 and 200 runners, since the race is longer." : "Easy running and some mobility work to keep your hips loose.",
         src: ev === "400" ? "Spencer & Gastin 2001" : "Francis high/low" },
       { id: "event", type: "high", focus: EVENT_DAY_INFO[ev].focus, why: EVENT_DAY_INFO[ev].why,
         blocks: [{ h: "On the track", items: EVENT_DAY[ev][ph] }, { h: "Cool down", items: ["Walk 400 m, then easy stretching | 10 min"] }],
-        whyLong: "The hardest day of the week. Small amounts, long rests. If you're clearly slower than usual, stop — don't grind.",
+        whyLong: "Not many reps, and take all the rest. If you're a lot slower than usual, call it a day.",
         src: ev === "400" ? "Spencer & Gastin 2001 · Francis" : "Haugen 2019 · Holler" }
     ];
   }
 
   const RACE = { id: "race", type: "race", focus: "Meet day", why: "Nothing new today. Warm up like always. Your race plan is below." };
-  const PREMEET = { id: "pre", type: "low", focus: "Day before the meet", why: "Wake your legs up, then go home. 30–40 minutes total.",
+  const PREMEET = { id: "pre", type: "low", focus: "Day before the meet", why: "A short practice to get your legs moving, then go home. 30–40 minutes.",
     blocks: [{ h: "", items: ["Drills | 2 × 20 m each", "Build-ups | 3 × 40 m", "Starts | 2 × 20 m, then done"] }],
-    whyLong: "You can't get faster the day before a race — only more tired. Stay fresh.", src: "Francis · ALTIS" };
-  const RECOVER = { id: "recover", type: "low", focus: "Easy day after the meet", why: "Flush out yesterday's races.",
+    whyLong: "Keeping it short the day before helps you feel fresh for the meet.", src: "Francis · ALTIS" };
+  const RECOVER = { id: "recover", type: "low", focus: "Easy day after the meet", why: "An easy day after racing.",
     blocks: [{ h: "Run", items: ["Easy 100s on grass | 6 × 100 m · about 60% · walk back"] }, { h: "After", items: ["Hurdle mobility | 2 passes", "Core | 10 min"] }],
-    whyLong: "A race is a hard day. The day after is always easy.", src: "Francis high/low" };
+    whyLong: "Racing counts as a hard day, so the day after is easy.", src: "Francis high/low" };
 
   /* ================= week with meets ================= */
   // A meet is a hard day. Day before = pre-meet, day after = easy.
@@ -493,7 +493,7 @@
   /* ================= render ================= */
 
   function renderPick() {
-    $("eventList").innerHTML = Object.keys(EVENTS).map((k) => '<button type="button" data-ev="' + k + '" class="' + (k === ev ? "on" : "") + '"><b>' + EVENTS[k].label + "</b><span>" + EVENTS[k].blurb + "</span></button>").join("");
+    $("eventList").innerHTML = Object.keys(EVENTS).map((k) => '<button type="button" data-ev="' + k + '" class="' + (k === ev ? "on" : "") + '"><b>' + EVENTS[k].label + "</b></button>").join("");
   }
 
   const stepsOf = (s) => s && s.blocks ? s.blocks.reduce((n, b) => n + b.items.length, 0) : 0;
@@ -554,7 +554,7 @@
       '<button type="button" class="meetbtn' + (isMeet ? " on" : "") + '" data-meet="1">' + (isMeet ? "★ Meet this day — tap to remove" : "I have a meet this day") + "</button>";
 
     if (!s) {
-      $("day").innerHTML = '<div class="band rest"><div class="kind">' + esc(DAYS_LONG[selDay]) + ' · Off</div><div class="focus">Rest day</div><p class="why">Rest is when you actually get faster.</p></div>' + meetBtn +
+      $("day").innerHTML = '<div class="band rest"><div class="kind">' + esc(DAYS_LONG[selDay]) + ' · Off</div><div class="focus">Rest day</div><p class="why">Take the day off.</p></div>' + meetBtn +
         '<div class="restmsg"><ul><li>Walk, stretch, or play something for fun</li><li>Sleep 8–9 hours</li><li>Eat real meals</li></ul></div>';
       return;
     }
@@ -606,14 +606,14 @@
     let body = '<label class="field">My goal time for the ' + EVENTS[ev].label + ' <input id="goalIn" inputmode="decimal" placeholder="' + ({ "100": "11.5", "200": "23.5", "400": "52.0" }[ev]) + '" value="' + esc(goals[ev] || "") + '"></label>';
     if (ev === "100") {
       body += (g ? '<div class="splits"><div class="split"><b>' + fmt(g * 0.39) + '</b><span>30 m</span></div><div class="split"><b>' + fmt(g * 0.66) + '</b><span>60 m</span></div><div class="split"><b>' + fmt(g) + "</b><span>Finish</span></div></div>" : "") +
-        '<ul class="key"><li><b>0–30 m</b> Push. Stay low, let yourself rise.</li><li><b>30–60 m</b> Tall and fast. This is top speed.</li><li><b>60–100 m</b> Relax your face and shoulders. Everyone slows down — slow down least.</li></ul>';
+        '<ul class="key"><li><b>0–30 m</b> Stay low and push, then gradually come up.</li><li><b>30–60 m</b> Run tall. This is where you hit top speed.</li><li><b>60–100 m</b> Stay relaxed in your face and shoulders.</li></ul>';
     } else if (ev === "200") {
       body += (g ? '<div class="splits"><div class="split"><b>' + fmt(g * 0.51) + '</b><span>100 m (off the curve)</span></div><div class="split"><b>' + fmt(g * 0.49) + '</b><span>last 100 m</span></div><div class="split"><b>' + fmt(g) + "</b><span>Finish</span></div></div>" : "") +
-        '<ul class="key"><li><b>The curve</b> Hard out of the blocks, run the inside of your lane, lean from your ankles.</li><li><b>Off the curve</b> Float for a few steps — fast but relaxed. You are at top speed.</li><li><b>Last 80 m</b> Stay tall, keep your arms going. Don\'t tighten up.</li></ul>';
+        '<ul class="key"><li><b>The curve</b> Get out of the blocks fast and run the inside of your lane.</li><li><b>Off the curve</b> Stay fast but relaxed coming into the straight.</li><li><b>Last 80 m</b> Run tall and keep your arms moving.</li></ul>';
     } else {
       body += (g ? '<div class="splits"><div class="split"><b>' + fmt(g / 2 - 1.2) + '</b><span>200 m</span></div><div class="split"><b>' + fmt(g * 0.74) + '</b><span>300 m</span></div><div class="split"><b>' + fmt(g) + "</b><span>Finish</span></div></div>" : "") +
-        '<ul class="key"><li><b>First 100</b> Fast out of the blocks.</li><li><b>Back straight</b> Float — fast but relaxed. Don\'t race here.</li><li><b>Last curve</b> Start driving your arms.</li><li><b>Last 100</b> Stay tall, keep your form. The one who slows least wins.</li></ul>' +
-        '<p class="hint">Check: your second 200 should be about 2–3 seconds slower than your first. Much more, you went out too fast.</p>';
+        '<ul class="key"><li><b>First 100</b> Get out of the blocks fast.</li><li><b>Back straight</b> Fast but relaxed.</li><li><b>Last curve</b> Start pumping your arms.</li><li><b>Last 100</b> Run tall and keep your arms moving.</li></ul>' +
+        '<p class="hint">Your second 200 is usually about 2–3 seconds slower than your first. If it\'s a lot more, try going out a little slower next time.</p>';
     }
     $("raceWrap").innerHTML = body;
   }
