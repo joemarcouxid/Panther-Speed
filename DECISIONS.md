@@ -48,3 +48,24 @@ but itself. It's a 600KB file, which is fine, and it works on bad track wifi.
 
 **Aug 2026 — The app says what broke.** If it ever fails to start it now prints
 the error on screen instead of showing a blank page.
+
+**Nov 2026 — Athlete picks their event; the app gives the workout.** Replaces
+the coach-posts-the-week model. The coach board never synced between phones,
+so athletes were seeing a default week anyway. Now each athlete picks 100, 200
+or 400 and gets a plan built for that event and the time of year.
+
+**Nov 2026 — Back to one plain HTML file, no React.** The compiled 600KB build
+couldn't be edited by hand. The new `index.html` is ~50KB of readable HTML and
+JavaScript: open it, change a workout, commit.
+
+**Nov 2026 — The track is flat.** No hill sprints anywhere. Resisted sprints
+use the ExerGenie or Activator belt — heavy only in summer (with free sprints
+right after), light the rest of the year.
+
+**Nov 2026 — Meets rearrange the week.** A meet counts as a hard day; the day
+before is a pre-meet, the day after is easy, and the number of extra hard days
+drops in meet weeks.
+
+**Nov 2026 — Works offline.** A small service worker (`sw.js`) caches the app
+so it opens at the track with no signal. Bump `VERSION` in `sw.js` on every
+change.

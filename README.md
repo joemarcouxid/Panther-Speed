@@ -2,8 +2,8 @@
 
 Sprint training for Wenatchee High School — 100m, 200m, 400m.
 
-Coach posts the week. Athletes open their phone and see today's workout in
-plain language.
+Athletes pick their event (100, 200 or 400) and see today's workout in plain
+language — built for their event and the time of year.
 
 ## Live app
 
@@ -27,7 +27,9 @@ That's the link you text athletes.
 ## Changing something later
 
 Open `index.html` on GitHub, click the pencil icon, edit, commit. The site
-rebuilds itself in under a minute and the link never changes.
+rebuilds itself in under a minute and the link never changes. The workouts are
+plain lists near the top of the script (`ACCEL`, `MAXV`, `EVENT_DAY`, …).
+After any change, bump `VERSION` in `sw.js` so phones load the new copy.
 
 Everything is in that one file — the workouts, the colors, the layout. There
 is nothing to install and nothing to build.
@@ -38,6 +40,7 @@ is nothing to install and nothing to build.
 |---|---|
 | `index.html` | The entire app. |
 | `manifest.json` | Lets phones install it to the home screen. |
+| `sw.js` | Keeps the app working with no signal. |
 | `icon-192.png`, `icon-512.png` | Home screen icon. |
 | `logo.png` | Panthers mark, background removed. |
 | `.nojekyll` | Tells GitHub to serve the files as-is. Don't delete it. |
@@ -54,8 +57,7 @@ It opens full screen with the Panthers icon after that.
 
 ## Status
 
-Working and usable. The one thing missing is that the coach's board doesn't
-sync between phones yet — see `docs/PROGRESS.md`.
+Working and usable. See `PROGRESS.md`.
 
 ## Logo
 

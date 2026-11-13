@@ -1,40 +1,40 @@
 # Panther Speed — what this is
 
 ## The one-sentence version
-Wenatchee High School sprinters open their phone and see exactly what today's
-workout is, in words they understand.
+A Wenatchee High School sprinter picks their event and sees exactly what
+today's workout is, in words they understand.
 
 ## Who uses it
-- **Sprinters running 100m, 200m or 400m.** They read. They never decide.
-- **The sprint coach.** Posts the week, changes it whenever plans change,
-  sends notes to the group.
-
-## The problem it solves
-Workouts live on a whiteboard, in a group text, or in the coach's head. Plans
-change — weather, meet schedules, the track being resurfaced. Athletes show up
-not knowing what they're doing, or knowing a version that's two days old.
+- **Sprinters running 100m, 200m or 400m.** They pick their event once. The app
+  does the rest.
 
 ## What it does
 
-**Today** — the day's session. Its name, whether it's hard or easy, the warmup,
-each set with distance and rest time, the lifting or circuit afterward, and a
-short honest answer to "why am I doing this."
+**Pick your event** — 100, 200 or 400. Changeable any time.
 
-**Week** — all seven days at a glance. The coach taps any day to change it.
+**Today** — the day's workout: hard or easy, warm-up, each rep with distance
+and rest, jumps, the weight room after on hard days, and a short "why".
+Tap each step to tick it off. Tap **i** on anything for how to do it.
 
-**Times** — each athlete logs their own times. Best times surface automatically.
-Also works out their easy-day pace so easy days actually stay easy.
+**The week** — Mon acceleration, Tue easy, Wed top speed, Thu easy, Fri the
+event-specific day (100 speed endurance / 200 curve work / 400 strength),
+weekend off. Changes with the time of year (summer base, fall build, winter
+pre-season, track season, championships).
 
-**Race** — enter a goal time, get the splits and what each mark should feel
-like. Plus the last-ten-days-before-a-big-meet rules.
+**Meets** — "I have a meet this day" on any day. The week rebuilds: day before
+is a pre-meet, day after is easy, and hard days never touch a meet.
 
-## Deliberately not in version one
-- Attendance or roster management
-- Video and form analysis
-- Anything for distance runners, throwers, jumpers or hurdlers
-- Messaging between athletes
-- Coach seeing athletes' logged times
+**Times** — sprints marked "time it" have a box. Best times show up under
+"My best times".
+
+**Race plan** — enter a goal time, get the splits and how each part should
+feel.
+
+## Deliberately not in this version
+- Coach board / posting a shared week (it never synced between phones)
+- Distance, jumps, throws, hurdles
+- Accounts, rosters, messaging
 
 ## What "done" looks like
-A sprinter can be handed a link, add it to their home screen, and know what
-they're doing at practice without asking anyone.
+A sprinter can be handed a link, pick their event, add it to their home
+screen, and know what they're doing at practice without asking anyone.
